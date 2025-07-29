@@ -15,13 +15,12 @@
   <h2 id="overs">Overs: 0.0</h2>
 
   <div>
-    <button onclick="updateScore(1)">➕ Score</button>
-    <button onclick="updateScore(-1)">➖ Score</button>
-    <button onclick="addWicket()">➕ Wicket</button>
-    <button onclick="reset()">🔄 Reset</button>
+    <button id="addScore">➕ Score</button>
+    <button id="subtractScore">➖ Score</button>
+    <button id="addWicket">➕ Wicket</button>
+    <button id="reset">🔄 Reset</button>
   </div>
 
-  <!-- Firebase -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
     import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-database.js";
@@ -49,11 +48,24 @@
     }
 
     function saveState() {
-      set(scoreRef, { score, wickets, overs, balls });
+      set(scoreRef, {
+        score: score,
+        wickets: wickets,
+        overs: overs,
+        balls: balls
+      });
+    }
+
+    function addBall() {
+      balls++;
+      if (balls === 6) {
+        balls = 0;
+        overs++;
+      }
     }
 
     function updateScore(delta) {
-      if (delta < 0 && score <= 0) return;
+      if (delta < 0 && score === 0) return;
       score += delta;
       addBall();
       saveState();
@@ -66,15 +78,7 @@
       saveState();
     }
 
-    function addBall() {
-      balls++;
-      if (balls === 6) {
-        balls = 0;
-        overs++;
-      }
-    }
-
-    function reset() {
+    function resetScore() {
       score = 0;
       wickets = 0;
       overs = 0;
@@ -82,7 +86,7 @@
       saveState();
     }
 
-    // Listen for changes from Firebase
+    // Listen for realtime changes
     onValue(scoreRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
@@ -93,6 +97,12 @@
         updateDisplay();
       }
     });
+
+    // Button listeners
+    document.getElementById("addScore").addEventListener("click", () => updateScore(1));
+    document.getElementById("subtractScore").addEventListener("click", () => updateScore(-1));
+    document.getElementById("addWicket").addEventListener("click", () => addWicket());
+    document.getElementById("reset").addEventListener("click", () => resetScore());
 
     updateDisplay();
   </script>
