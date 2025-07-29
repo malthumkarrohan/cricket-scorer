@@ -15,18 +15,19 @@
   <h2 id="overs">Overs: 0.0</h2>
 
   <div>
-    <button onclick="addRun(1)">1 Run</button>
-    <button onclick="addRun(2)">2 Runs</button>
-    <button onclick="addRun(3)">3 Runs</button>
-    <button onclick="addRun(4)">4 Runs</button>
-    <button onclick="addRun(6)">6 Runs</button>
+    <button id="run1">1 Run</button>
+    <button id="run2">2 Runs</button>
+    <button id="run3">3 Runs</button>
+    <button id="run4">4 Runs</button>
+    <button id="run6">6 Runs</button>
   </div>
 
   <div>
-    <button onclick="addExtra('noBall')">No Ball</button>
-    <button onclick="addExtra('wide')">Wide</button>
-    <button onclick="addWicket()">Wicket</button>
-    <button onclick="reset()">Reset</button>
+    <button id="noball">No Ball</button>
+    <button id="wide">Wide</button>
+    <button id="wicket">Wicket</button>
+    <button id="undo">Undo</button>
+    <button id="reset">Next Match</button>
   </div>
 
   <script type="module">
@@ -48,6 +49,7 @@
     const scoreRef = ref(db, "scoreData");
 
     let score = 0, wickets = 0, overs = 0, balls = 0;
+    let history = [];
 
     function updateDisplay() {
       document.getElementById("score").textContent = `Score: ${score}`;
@@ -60,12 +62,14 @@
         score,
         wickets,
         overs,
-        balls
+        balls,
+        history
       });
     }
 
     function addRun(runs) {
       score += runs;
+      history.push({ action: 'run', value: runs });
       addBall();
       saveState();
     }
@@ -73,16 +77,15 @@
     function addWicket() {
       if (wickets >= 10) return;
       wickets++;
+      history.push({ action: 'wicket' });
       addBall();
       saveState();
     }
 
     function addExtra(type) {
-      if (type === "noBall" || type === "wide") {
-        score += 1; // Extra run
-        // No ball does not count toward ball count
-        saveState();
-      }
+      score += 1;
+      history.push({ action: type }); // 'noball' or 'wide'
+      saveState();
     }
 
     function addBall() {
@@ -93,15 +96,52 @@
       }
     }
 
-    function reset() {
+    function removeBall() {
+      if (balls === 0 && overs > 0) {
+        overs--;
+        balls = 5;
+      } else if (balls > 0) {
+        balls--;
+      }
+    }
+
+    function undo() {
+      if (history.length === 0) return;
+      const last = history.pop();
+
+      switch (last.action) {
+        case 'run':
+          score -= last.value;
+          removeBall();
+          break;
+        case 'wicket':
+          wickets--;
+          removeBall();
+          break;
+        case 'noball':
+        case 'wide':
+          score -= 1;
+          break;
+      }
+
+      saveState();
+      updateDisplay();
+    }
+
+    function resetScore() {
+      const confirmReset = confirm("Are you sure you want to start a new match?");
+      if (!confirmReset) return;
+
       score = 0;
       wickets = 0;
       overs = 0;
       balls = 0;
+      history = [];
       saveState();
+      updateDisplay();
     }
 
-    // Listen for Firebase data
+    // Realtime listener from Firebase
     onValue(scoreRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
@@ -109,9 +149,22 @@
         wickets = data.wickets || 0;
         overs = data.overs || 0;
         balls = data.balls || 0;
+        history = data.history || [];
         updateDisplay();
       }
     });
+
+    // Attach button events (ensures they work across devices/browsers)
+    document.getElementById("run1").addEventListener("click", () => addRun(1));
+    document.getElementById("run2").addEventListener("click", () => addRun(2));
+    document.getElementById("run3").addEventListener("click", () => addRun(3));
+    document.getElementById("run4").addEventListener("click", () => addRun(4));
+    document.getElementById("run6").addEventListener("click", () => addRun(6));
+    document.getElementById("noball").addEventListener("click", () => addExtra("noball"));
+    document.getElementById("wide").addEventListener("click", () => addExtra("wide"));
+    document.getElementById("wicket").addEventListener("click", () => addWicket());
+    document.getElementById("undo").addEventListener("click", () => undo());
+    document.getElementById("reset").addEventListener("click", () => resetScore());
 
     updateDisplay();
   </script>
