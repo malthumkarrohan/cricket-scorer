@@ -5,27 +5,51 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>🏏 Cricket Scorer</title>
   <style>
-    * {
-      box-sizing: border-box;
+    :root {
+      --bg: #f8f9fa;
+      --text: #222;
+      --button: #007bff;
+      --button-text: #fff;
+    }
+
+    body.dark {
+      --bg: #121212;
+      --text: #f1f1f1;
+      --button: #1e90ff;
+      --button-text: #fff;
     }
 
     body {
+      background: var(--bg);
+      color: var(--text);
       font-family: 'Segoe UI', sans-serif;
       margin: 0;
       padding: 20px;
       text-align: center;
-      background: #f8f9fa;
-      color: #333;
+      transition: background 0.3s ease, color 0.3s ease;
     }
 
     h1 {
       font-size: 2rem;
-      margin-bottom: 0.5rem;
+      margin: 0.5rem 0;
     }
 
     .scoreboard h2 {
       margin: 0.2rem 0;
-      font-size: 1.5rem;
+      font-size: 1.3rem;
+    }
+
+    .teams {
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+
+    .teams img {
+      width: 50px;
+      height: 50px;
+      object-fit: contain;
     }
 
     .button-group {
@@ -33,7 +57,7 @@
       flex-wrap: wrap;
       justify-content: center;
       gap: 10px;
-      margin: 20px 0;
+      margin: 15px 0;
     }
 
     button {
@@ -42,8 +66,8 @@
       font-size: 1rem;
       border: none;
       border-radius: 8px;
-      background-color: #007bff;
-      color: white;
+      background-color: var(--button);
+      color: var(--button-text);
       transition: background-color 0.3s ease;
       min-width: 120px;
     }
@@ -52,8 +76,32 @@
       background-color: #0056b3;
     }
 
-    button:active {
-      transform: scale(0.97);
+    #toggle-theme {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      padding: 6px 12px;
+      font-size: 0.8rem;
+    }
+
+    #commentary {
+      text-align: left;
+      margin: 20px auto;
+      max-width: 500px;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.8);
+      color: #000;
+      font-size: 0.9rem;
+      max-height: 150px;
+      overflow-y: auto;
+    }
+
+    body.dark #commentary {
+      background: #1e1e1e;
+      color: #ddd;
+      border-color: #333;
     }
 
     @media (min-width: 768px) {
@@ -69,6 +117,13 @@
   </style>
 </head>
 <body>
+  <button id="toggle-theme">🌙 Dark Mode</button>
+
+  <div class="teams">
+    <div><img src="https://upload.wikimedia.org/wikipedia/en/3/35/India_cricket_team_logo.svg" alt="Team 1" /><br>India</div>
+    <div><img src="https://upload.wikimedia.org/wikipedia/en/f/fd/Pakistan_Cricket_Board_Logo.svg" alt="Team 2" /><br>Pakistan</div>
+  </div>
+
   <h1>🏏 Cricket Scorer</h1>
   <div class="scoreboard">
     <h2 id="score">Score: 0</h2>
@@ -77,6 +132,7 @@
   </div>
 
   <div class="button-group">
+    <button id="dot">0 Run</button>
     <button id="run1">1 Run</button>
     <button id="run2">2 Runs</button>
     <button id="run3">3 Runs</button>
@@ -88,6 +144,13 @@
     <button id="undo">Undo</button>
     <button id="reset">Next Match</button>
   </div>
+
+  <div id="commentary"><strong>Ball-by-ball Commentary:</strong><br/></div>
+
+  <!-- Confetti -->
+  <canvas id="confetti" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;"></canvas>
+
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
@@ -116,6 +179,12 @@
       document.getElementById("overs").textContent = `Overs: ${overs}.${balls}`;
     }
 
+    function addCommentary(text) {
+      const box = document.getElementById("commentary");
+      box.innerHTML += `• ${text}<br>`;
+      box.scrollTop = box.scrollHeight;
+    }
+
     function saveState() {
       set(scoreRef, {
         score,
@@ -130,6 +199,8 @@
       score += runs;
       history.push({ action: 'run', value: runs });
       addBall();
+      if (runs === 6) confetti(); // 🎉
+      addCommentary(`${runs} run${runs > 1 ? 's' : ''}`);
       saveState();
     }
 
@@ -138,12 +209,14 @@
       wickets++;
       history.push({ action: 'wicket' });
       addBall();
+      addCommentary(`Wicket!`);
       saveState();
     }
 
     function addExtra(type) {
       score += 1;
-      history.push({ action: type }); // 'noball' or 'wide'
+      history.push({ action: type });
+      addCommentary(type === 'noball' ? 'No Ball' : 'Wide');
       saveState();
     }
 
@@ -183,6 +256,7 @@
           break;
       }
 
+      addCommentary("Undid last action");
       saveState();
       updateDisplay();
     }
@@ -196,10 +270,39 @@
       overs = 0;
       balls = 0;
       history = [];
+      document.getElementById("commentary").innerHTML = "<strong>Ball-by-ball Commentary:</strong><br/>";
       saveState();
       updateDisplay();
     }
 
+    // 🎉 Confetti on 6 runs
+    function confetti() {
+      const duration = 1 * 1000;
+      const end = Date.now() + duration;
+      const colors = ['#bb0000', '#ffffff'];
+
+      (function frame() {
+        confettiLib({
+          particleCount: 2,
+          angle: 60,
+          spread: 55,
+          origin: { x: 0 },
+          colors: colors
+        });
+        confettiLib({
+          particleCount: 2,
+          angle: 120,
+          spread: 55,
+          origin: { x: 1 },
+          colors: colors
+        });
+        if (Date.now() < end) {
+          requestAnimationFrame(frame);
+        }
+      })();
+    }
+
+    // Firebase listener
     onValue(scoreRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
@@ -210,6 +313,15 @@
         history = data.history || [];
         updateDisplay();
       }
+    });
+
+    // Event listeners
+    document.getElementById("dot").addEventListener("click", () => {
+      addBall();
+      history.push({ action: 'dot' });
+      addCommentary("Dot ball");
+      saveState();
+      updateDisplay();
     });
 
     document.getElementById("run1").addEventListener("click", () => addRun(1));
@@ -223,7 +335,12 @@
     document.getElementById("undo").addEventListener("click", () => undo());
     document.getElementById("reset").addEventListener("click", () => resetScore());
 
-    updateDisplay();
+    // Theme toggle
+    document.getElementById("toggle-theme").addEventListener("click", () => {
+      document.body.classList.toggle("dark");
+    });
+
+    const confettiLib = window.confetti;
   </script>
 </body>
 </html>
