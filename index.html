@@ -39,19 +39,6 @@
       font-size: 1.3rem;
     }
 
-    .teams {
-      display: flex;
-      justify-content: space-around;
-      align-items: center;
-      margin-bottom: 1rem;
-    }
-
-    .teams img {
-      width: 50px;
-      height: 50px;
-      object-fit: contain;
-    }
-
     .button-group {
       display: flex;
       flex-wrap: wrap;
@@ -119,11 +106,6 @@
 <body>
   <button id="toggle-theme">🌙 Dark Mode</button>
 
-  <div class="teams">
-    <div><img src="https://upload.wikimedia.org/wikipedia/en/3/35/India_cricket_team_logo.svg" alt="Team 1" /><br>India</div>
-    <div><img src="https://upload.wikimedia.org/wikipedia/en/f/fd/Pakistan_Cricket_Board_Logo.svg" alt="Team 2" /><br>Pakistan</div>
-  </div>
-
   <h1>🏏 Cricket Scorer</h1>
   <div class="scoreboard">
     <h2 id="score">Score: 0</h2>
@@ -147,9 +129,7 @@
 
   <div id="commentary"><strong>Ball-by-ball Commentary:</strong><br/></div>
 
-  <!-- Confetti -->
   <canvas id="confetti" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;"></canvas>
-
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
   <script type="module">
@@ -179,9 +159,10 @@
       document.getElementById("overs").textContent = `Overs: ${overs}.${balls}`;
     }
 
-    function addCommentary(text) {
+    function addCommentary(eventText) {
+      const ballLabel = `${overs}.${balls}`;
       const box = document.getElementById("commentary");
-      box.innerHTML += `• ${text}<br>`;
+      box.innerHTML += `• ${ballLabel} - ${eventText}<br>`;
       box.scrollTop = box.scrollHeight;
     }
 
@@ -209,14 +190,14 @@
       wickets++;
       history.push({ action: 'wicket' });
       addBall();
-      addCommentary(`Wicket!`);
+      addCommentary("Wicket");
       saveState();
     }
 
     function addExtra(type) {
       score += 1;
       history.push({ action: type });
-      addCommentary(type === 'noball' ? 'No Ball' : 'Wide');
+      addCommentary(type === 'noball' ? "No Ball" : "Wide");
       saveState();
     }
 
@@ -254,6 +235,9 @@
         case 'wide':
           score -= 1;
           break;
+        case 'dot':
+          removeBall();
+          break;
       }
 
       addCommentary("Undid last action");
@@ -275,34 +259,27 @@
       updateDisplay();
     }
 
-    // 🎉 Confetti on 6 runs
     function confetti() {
-      const duration = 1 * 1000;
+      const duration = 1000;
       const end = Date.now() + duration;
-      const colors = ['#bb0000', '#ffffff'];
 
       (function frame() {
-        confettiLib({
-          particleCount: 2,
+        window.confetti({
+          particleCount: 3,
           angle: 60,
           spread: 55,
-          origin: { x: 0 },
-          colors: colors
+          origin: { x: 0 }
         });
-        confettiLib({
-          particleCount: 2,
+        window.confetti({
+          particleCount: 3,
           angle: 120,
           spread: 55,
-          origin: { x: 1 },
-          colors: colors
+          origin: { x: 1 }
         });
-        if (Date.now() < end) {
-          requestAnimationFrame(frame);
-        }
+        if (Date.now() < end) requestAnimationFrame(frame);
       })();
     }
 
-    // Firebase listener
     onValue(scoreRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
@@ -335,12 +312,11 @@
     document.getElementById("undo").addEventListener("click", () => undo());
     document.getElementById("reset").addEventListener("click", () => resetScore());
 
-    // Theme toggle
     document.getElementById("toggle-theme").addEventListener("click", () => {
       document.body.classList.toggle("dark");
     });
 
-    const confettiLib = window.confetti;
+    updateDisplay();
   </script>
 </body>
 </html>
