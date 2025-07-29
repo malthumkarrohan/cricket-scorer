@@ -39,6 +39,13 @@
       font-size: 1.3rem;
     }
 
+    .target {
+      font-weight: bold;
+      font-size: 1.2rem;
+      color: #bb0000;
+      margin-top: 10px;
+    }
+
     .button-group {
       display: flex;
       flex-wrap: wrap;
@@ -107,10 +114,14 @@
   <button id="toggle-theme">🌙 Dark Mode</button>
 
   <h1>🏏 Cricket Scorer</h1>
+
+  <div class="target" id="targetDisplay" style="display: none;"></div>
+
   <div class="scoreboard">
     <h2 id="score">Score: 0</h2>
     <h2 id="wickets">Wickets: 0/10</h2>
     <h2 id="overs">Overs: 0.0</h2>
+    <h2 id="innings">Innings: 1</h2>
   </div>
 
   <div class="button-group">
@@ -123,6 +134,7 @@
     <button id="noball">No Ball</button>
     <button id="wide">Wide</button>
     <button id="wicket">Wicket</button>
+    <button id="endInnings">End Innings</button>
     <button id="undo">Undo</button>
     <button id="reset">Next Match</button>
   </div>
@@ -151,12 +163,23 @@
     const scoreRef = ref(db, "scoreData");
 
     let score = 0, wickets = 0, overs = 0, balls = 0;
+    let innings = 1;
+    let target = null;
     let history = [];
 
     function updateDisplay() {
       document.getElementById("score").textContent = `Score: ${score}`;
       document.getElementById("wickets").textContent = `Wickets: ${wickets}/10`;
       document.getElementById("overs").textContent = `Overs: ${overs}.${balls}`;
+      document.getElementById("innings").textContent = `Innings: ${innings}`;
+      const targetBox = document.getElementById("targetDisplay");
+
+      if (innings === 2 && target !== null) {
+        targetBox.textContent = `Target: ${target} to win`;
+        targetBox.style.display = "block";
+      } else {
+        targetBox.style.display = "none";
+      }
     }
 
     function addCommentary(eventText) {
@@ -168,11 +191,7 @@
 
     function saveState() {
       set(scoreRef, {
-        score,
-        wickets,
-        overs,
-        balls,
-        history
+        score, wickets, overs, balls, history, innings, target
       });
     }
 
@@ -180,7 +199,7 @@
       score += runs;
       history.push({ action: 'run', value: runs });
       addBall();
-      if (runs === 6) confetti(); // 🎉
+      if (runs === 6) confetti();
       addCommentary(`${runs} run${runs > 1 ? 's' : ''}`);
       saveState();
     }
@@ -221,25 +240,13 @@
     function undo() {
       if (history.length === 0) return;
       const last = history.pop();
-
       switch (last.action) {
-        case 'run':
-          score -= last.value;
-          removeBall();
-          break;
-        case 'wicket':
-          wickets--;
-          removeBall();
-          break;
+        case 'run': score -= last.value; removeBall(); break;
+        case 'wicket': wickets--; removeBall(); break;
         case 'noball':
-        case 'wide':
-          score -= 1;
-          break;
-        case 'dot':
-          removeBall();
-          break;
+        case 'wide': score -= 1; break;
+        case 'dot': removeBall(); break;
       }
-
       addCommentary("Undid last action");
       saveState();
       updateDisplay();
@@ -248,34 +255,30 @@
     function resetScore() {
       const confirmReset = confirm("Are you sure you want to start a new match?");
       if (!confirmReset) return;
-
-      score = 0;
-      wickets = 0;
-      overs = 0;
-      balls = 0;
-      history = [];
+      score = 0; wickets = 0; overs = 0; balls = 0;
+      history = []; innings = 1; target = null;
       document.getElementById("commentary").innerHTML = "<strong>Ball-by-ball Commentary:</strong><br/>";
-      saveState();
-      updateDisplay();
+      saveState(); updateDisplay();
+    }
+
+    function endInnings() {
+      if (innings === 1) {
+        if (confirm("End first innings?")) {
+          target = score + 1;
+          score = 0; wickets = 0; overs = 0; balls = 0;
+          history = []; innings = 2;
+          addCommentary("Innings ended. Target set.");
+          saveState(); updateDisplay();
+        }
+      }
     }
 
     function confetti() {
       const duration = 1000;
       const end = Date.now() + duration;
-
       (function frame() {
-        window.confetti({
-          particleCount: 3,
-          angle: 60,
-          spread: 55,
-          origin: { x: 0 }
-        });
-        window.confetti({
-          particleCount: 3,
-          angle: 120,
-          spread: 55,
-          origin: { x: 1 }
-        });
+        window.confetti({ particleCount: 3, angle: 60, spread: 55, origin: { x: 0 } });
+        window.confetti({ particleCount: 3, angle: 120, spread: 55, origin: { x: 1 } });
         if (Date.now() < end) requestAnimationFrame(frame);
       })();
     }
@@ -288,17 +291,16 @@
         overs = data.overs || 0;
         balls = data.balls || 0;
         history = data.history || [];
+        innings = data.innings || 1;
+        target = data.target || null;
         updateDisplay();
       }
     });
 
-    // Event listeners
+    // Events
     document.getElementById("dot").addEventListener("click", () => {
-      addBall();
-      history.push({ action: 'dot' });
-      addCommentary("Dot ball");
-      saveState();
-      updateDisplay();
+      addBall(); history.push({ action: 'dot' });
+      addCommentary("Dot ball"); saveState(); updateDisplay();
     });
 
     document.getElementById("run1").addEventListener("click", () => addRun(1));
@@ -311,7 +313,7 @@
     document.getElementById("wicket").addEventListener("click", () => addWicket());
     document.getElementById("undo").addEventListener("click", () => undo());
     document.getElementById("reset").addEventListener("click", () => resetScore());
-
+    document.getElementById("endInnings").addEventListener("click", () => endInnings());
     document.getElementById("toggle-theme").addEventListener("click", () => {
       document.body.classList.toggle("dark");
     });
